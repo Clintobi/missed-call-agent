@@ -1,0 +1,15 @@
+{
+  "name": "missed-call-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "When a home-services business misses a call, this instantly texts the customer back, qualifies the job over SMS with Claude, and books it — recovering jobs that would have gone to a competitor.",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0"
+  }
+}
