@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VNSIS · Missed-Call Agent</title>
+<meta name="description" content="When a home-services business misses a call, an AI texts the customer back, qualifies the job, and books it.">
+</head><body>
+<style>
+  :root {
+    --bg: #05070c;
+    --phone: #000000;
+    --hdr: rgba(20,20,22,0.72);
+    --incoming: #2a2a2e;
+    --outgoing-1: #2a8bfa;
+    --outgoing-2: #147cf3;
+    --txt: #f2f3f5;
+    --muted: #8b8b90;
+    --hair: rgba(255,255,255,0.10);
+    --green: #34c759;
+    --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; padding: 22px;
+    background:
+      radial-gradient(80% 55% at 50% 4%, #0e1826 0%, transparent 60%),
+      radial-gradient(90% 60% at 50% 108%, #10131c 0%, transparent 55%),
+      var(--bg);
+    font-family: var(--sys); color: var(--txt); -webkit-font-smoothing: antialiased;
+  }
+
+  .phone {
+    width: min(360px, 90vw); aspect-ratio: 9 / 18.6; position: relative;
+    background: var(--phone); border-radius: 46px; overflow: hidden; border: 1px solid #1c1f27;
+    box-shadow: 0 2px 0 0 rgba(255,255,255,0.04) inset, 0 40px 90px -30px rgba(0,0,0,0.85),
+      0 0 0 8px #0a0c11, 0 0 0 9px #191c23;
+    display: flex; flex-direction: column;
+  }
+  .notch { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); width: 34%; height: 26px; background: #000; border-radius: 20px; z-index: 5; }
+
+  .status { height: 46px; flex: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 24px 6px; font-size: 14px; font-weight: 600; z-index: 4; }
+  .status .ico { display: flex; align-items: center; gap: 6px; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 11px; }
+  .bars span { width: 3px; background: #fff; border-radius: 1px; }
+  .bars span:nth-child(1){height:4px} .bars span:nth-child(2){height:6px} .bars span:nth-child(3){height:9px} .bars span:nth-child(4){height:11px}
+
+  .cbar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px 12px; background: var(--hdr); backdrop-filter: blur(12px); border-bottom: 1px solid var(--hair); }
+  .chev { color: #2a8bfa; font-size: 24px; line-height: 1; margin-top: -2px; }
+  .who { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(160deg, #3a4658, #232a36); color: #cdd7e6; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,0.08); }
+  .who .nm { font-size: 12.5px; font-weight: 600; }
+  .who .sub { font-size: 10px; color: var(--muted); }
+  .cbar .rt { color: #2a8bfa; font-size: 17px; }
+
+  .thread { flex: 1; overflow: hidden; padding: 12px 14px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .daysep { text-align: center; font-size: 10.5px; color: var(--muted); margin: 2px 0 10px; }
+  .daysep b { color: #a9a9ae; font-weight: 600; }
+
+  .row { display: flex; margin-top: 5px; }
+  .row.in { justify-content: flex-start; }
+  .row.out { justify-content: flex-end; }
+  .hide { display: none !important; }
+
+  .bubble {
+    max-width: 78%; font-size: 14px; line-height: 1.33; padding: 8px 13px; border-radius: 19px;
+    opacity: 0; transform: translateY(9px) scale(0.96);
+    transition: opacity .26s ease, transform .34s cubic-bezier(.2,.9,.3,1.35);
+  }
+  .bubble.show { opacity: 1; transform: none; }
+  .in .bubble { background: var(--incoming); color: var(--txt); border-bottom-left-radius: 6px; }
+  .out .bubble { background: linear-gradient(180deg, var(--outgoing-1), var(--outgoing-2)); color: #fff; border-bottom-right-radius: 6px; }
+  .tag { display: block; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #9a9aa0; margin-bottom: 2px; }
+
+  .delivered { font-size: 10px; color: var(--muted); align-self: flex-end; margin: 3px 3px 1px 0; opacity: 0; transition: opacity .3s ease; }
+  .delivered.show { opacity: 1; }
+
+  .typing { align-self: flex-start; background: var(--incoming); border-radius: 19px 19px 19px 6px; padding: 11px 14px; margin-top: 5px; gap: 4px; align-items: center; }
+  .typing:not(.show) { display: none; }
+  .typing.show { display: inline-flex; }
+  .typing i { width: 7px; height: 7px; border-radius: 50%; background: #8a8a90; display: inline-block; animation: td 1.25s infinite ease-in-out; }
+  .typing i:nth-child(2){ animation-delay: .16s } .typing i:nth-child(3){ animation-delay: .32s }
+  @keyframes td { 0%,60%,100%{ transform: translateY(0); opacity:.5 } 30%{ transform: translateY(-4px); opacity:1 } }
+
+  .confirm { max-width: 84%; align-self: flex-start; background: var(--incoming); border-radius: 19px 19px 19px 6px; overflow: hidden; margin-top: 5px; opacity: 0; transform: translateY(9px) scale(0.96); transition: opacity .3s ease, transform .42s cubic-bezier(.2,.9,.3,1.3); }
+  .confirm.show { opacity: 1; transform: none; }
+  .cf-top { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: rgba(52,199,89,0.14); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .cf-check { width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #04220f; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .cf-top .t { font-size: 13px; font-weight: 600; }
+  .cf-body { padding: 11px 14px 13px; display: flex; flex-direction: column; gap: 5px; }
+  .cf-biz { font-size: 13px; font-weight: 600; }
+  .cf-when { font-size: 13px; color: #dfe3ea; }
+  .cf-detail { font-size: 11.5px; color: var(--muted); }
+  .cf-badge { display: inline-block; margin-top: 3px; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #ff5a4d; font-weight: 700; }
+
+  .inputbar { flex: none; display: flex; align-items: center; gap: 9px; padding: 8px 12px 16px; border-top: 1px solid var(--hair); background: rgba(0,0,0,0.4); }
+  .field { flex: 1; height: 32px; border-radius: 18px; border: 1px solid #34343a; color: var(--muted); font-size: 12.5px; display: flex; align-items: center; padding: 0 13px; }
+  .send { width: 30px; height: 30px; border-radius: 50%; background: #1a1a1e; color: #4a4a50; display: grid; place-items: center; font-size: 15px; }
+
+  .footer { text-align: center; opacity: 0; transition: opacity .5s ease; }
+  .footer.show { opacity: 1; }
+  .stat { font-size: 14.5px; font-weight: 600; }
+  .stat .hl { color: var(--green); }
+  .brand { margin-top: 5px; font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; color: #5c6474; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bubble, .confirm { opacity: 1; transform: none; transition: none; }
+    .typing i { animation: none; }
+  }
+</style>
+
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status">
+    <span>2:14</span>
+    <span class="ico">
+      <span class="bars"><span></span><span></span><span></span><span></span></span>
+      <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 10.6a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM4 6.6a5.6 5.6 0 018 0M1.7 4.2a9 9 0 0112.6 0" stroke="#fff" stroke-width="1.25" fill="none" stroke-linecap="round"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.6" y="1.2" width="21" height="9.6" rx="2.6" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2.1" y="2.7" width="16" height="6.6" rx="1.4" fill="#fff"/><rect x="22.4" y="4" width="1.6" height="4" rx="0.8" fill="#fff" opacity=".45"/></svg>
+    </span>
+  </div>
+
+  <div class="cbar">
+    <span class="chev">‹</span>
+    <div class="who"><div class="avatar">RP</div><div class="nm">Rivera Plumbing</div><div class="sub">text message</div></div>
+    <span class="rt">ⓘ</span>
+  </div>
+
+  <div class="thread" id="thread">
+    <div class="daysep">Today <b>2:14 PM</b></div>
+
+    <div class="row in hide"><div class="bubble" data-i="0"><span class="tag">Auto text-back</span>Sorry we missed your call! We're out on a job. What do you need, and how urgent is it?</div></div>
+
+    <div class="typing" id="ty1"><i></i><i></i><i></i></div>
+    <div class="row out hide"><div class="bubble" data-i="1">Water heater's leaking all over the garage floor 😬</div></div>
+    <div class="delivered hide" id="d1">Delivered</div>
+
+    <div class="typing" id="ty2"><i></i><i></i><i></i></div>
+    <div class="row in hide"><div class="bubble" data-i="2">Sounds urgent, we can get someone out today. What's the address, and a name for the job?</div></div>
+
+    <div class="row out hide"><div class="bubble" data-i="3">4408 Oak Bend Dr, name's Marcus</div></div>
+    <div class="delivered hide" id="d2">Delivered</div>
+
+    <div class="typing" id="ty3"><i></i><i></i><i></i></div>
+    <div class="confirm hide" id="confirm">
+      <div class="cf-top"><span class="cf-check">✓</span><span class="t">Appointment confirmed</span></div>
+      <div class="cf-body">
+        <div class="cf-biz">Rivera Plumbing · Marcus</div>
+        <div class="cf-when">Today · 4:00 – 6:00 PM</div>
+        <div class="cf-detail">Water heater repair · 4408 Oak Bend Dr</div>
+        <div class="cf-badge">Emergency</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inputbar"><div class="field">Text Message</div><div class="send">↑</div></div>
+</div>
+
+<div class="footer" id="footer">
+  <div class="stat">Missed call → <span class="hl">booked job</span> in ~30 seconds. Zero staff time.</div>
+  <div class="brand">VNSIS · missed-call agent</div>
+</div>
+
+<script>
+  const thread = document.getElementById("thread");
+  const footer = document.getElementById("footer");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const scroll = () => { thread.scrollTop = thread.scrollHeight; };
+  const el = (id) => document.getElementById(id);
+  const B = (i) => document.querySelector(`.bubble[data-i="${i}"]`);
+
+  function reveal(node, animTarget) {
+    node.classList.remove("hide");
+    scroll();
+    void (animTarget || node).offsetWidth;     // reflow so the transition plays
+    (animTarget || node).classList.add("show");
+    scroll();
+  }
+  function revealBubble(i) { const b = B(i); reveal(b.closest(".row"), b); }
+  function delivered(id) { reveal(el(id)); }
+
+  async function typeThen(tyId, fn, ms) {
+    el(tyId).classList.add("show"); scroll();
+    await wait(ms);
+    el(tyId).classList.remove("show");
+    fn();
+  }
+
+  function reset() {
+    document.querySelectorAll(".row, .delivered").forEach(n => n.classList.add("hide"));
+    el("confirm").classList.add("hide");
+    document.querySelectorAll(".bubble, .confirm, .delivered").forEach(n => n.classList.remove("show"));
+    document.querySelectorAll(".typing").forEach(t => t.classList.remove("show"));
+    footer.classList.remove("show");
+    scroll();
+  }
+
+  async function run() {
+    reset();
+    if (reduced) {
+      document.querySelectorAll(".row, .delivered, .confirm").forEach(n => n.classList.remove("hide"));
+      document.querySelectorAll(".bubble, .confirm, .delivered").forEach(n => n.classList.add("show"));
+      footer.classList.add("show"); scroll(); return;
+    }
+    await wait(700);
+    revealBubble(0);
+    await wait(1000);
+    await typeThen("ty1", () => { revealBubble(1); }, 900);
+    delivered("d1");
+    await wait(650);
+    await typeThen("ty2", () => { revealBubble(2); }, 1250);
+    await wait(850);
+    revealBubble(3);
+    delivered("d2");
+    await wait(700);
+    await typeThen("ty3", () => { reveal(el("confirm")); }, 1350);
+    await wait(750);
+    footer.classList.add("show");
+    await wait(4300);
+    await run();
+  }
+
+  run();
+</script>
+</body></html>
