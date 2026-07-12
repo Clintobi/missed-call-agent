@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VNSIS · WhatsApp Booking Agent</title>
+<meta name="description" content="A customer messages your business on WhatsApp; an AI replies instantly, qualifies the job, and books it — so you never leave a customer on 'seen'.">
+<style>
+  :root {
+    --page: #05070a;
+    --header: #1f2c34;
+    --chat: #0b141a;
+    --in: #202c33;
+    --out: #005c4b;
+    --txt: #e9edef;
+    --sub: #8696a0;
+    --tick: #53bdeb;
+    --accent: #00a884;
+    --sys: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 15px; padding: 22px;
+    background: radial-gradient(75% 55% at 50% 4%, #0d1a1f 0%, transparent 60%), var(--page);
+    font-family: var(--sys); color: var(--txt); -webkit-font-smoothing: antialiased;
+  }
+  .phone {
+    width: min(360px, 90vw); aspect-ratio: 9 / 18.6; position: relative; overflow: hidden;
+    background: var(--chat); border-radius: 44px; border: 1px solid #1c1f27;
+    box-shadow: 0 40px 90px -30px rgba(0,0,0,0.85), 0 0 0 8px #0a0c11, 0 0 0 9px #191c23;
+    display: flex; flex-direction: column;
+  }
+  .notch { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); width: 32%; height: 24px; background: #000; border-radius: 20px; z-index: 6; }
+
+  .statusbar { height: 40px; flex: none; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 22px 4px; font-size: 12.5px; font-weight: 600; color: #cfd6db; background: var(--header); z-index: 4; }
+  .statusbar .r { display: flex; align-items: center; gap: 6px; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 10px; }
+  .bars span { width: 3px; background: #cfd6db; border-radius: 1px; }
+  .bars span:nth-child(1){height:4px} .bars span:nth-child(2){height:6px} .bars span:nth-child(3){height:8px} .bars span:nth-child(4){height:10px}
+
+  .wa-head { flex: none; display: flex; align-items: center; gap: 11px; padding: 7px 14px 9px; background: var(--header); }
+  .wa-head .back { color: #aebac1; font-size: 22px; line-height: 1; }
+  .wa-head .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(160deg, #0b7d6b, #0a4f45); font-size: 17px; }
+  .wa-head .meta { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .wa-head .nm { font-size: 14.5px; font-weight: 600; color: #e9edef; }
+  .wa-head .st { font-size: 11.5px; color: var(--sub); height: 14px; }
+  .wa-head .st.typing { color: var(--accent); }
+  .wa-head .icons { display: flex; gap: 16px; color: #aebac1; font-size: 16px; }
+
+  .chat { flex: 1; overflow: hidden; padding: 10px 9px 6px; display: flex; flex-direction: column; gap: 3px;
+    background-image: radial-gradient(rgba(255,255,255,0.018) 1px, transparent 1px); background-size: 22px 22px; }
+  .enc { align-self: center; background: #182229; color: #ffd279; font-size: 10px; text-align: center; padding: 5px 10px; border-radius: 7px; margin: 4px 20px 8px; line-height: 1.4; }
+  .daysep { align-self: center; background: #182229; color: #8696a0; font-size: 10.5px; padding: 3px 11px; border-radius: 7px; margin-bottom: 8px; }
+
+  .row { display: flex; margin-top: 2px; }
+  .row.in { justify-content: flex-start; }
+  .row.out { justify-content: flex-end; }
+  .hide { display: none !important; }
+
+  .bubble {
+    max-width: 80%; position: relative; font-size: 13.5px; line-height: 1.4; padding: 6px 9px 5px 10px;
+    border-radius: 9px; opacity: 0; transform: translateY(7px) scale(0.97);
+    transition: opacity .24s ease, transform .3s cubic-bezier(.2,.9,.3,1.3);
+  }
+  .bubble.show { opacity: 1; transform: none; }
+  .in .bubble { background: var(--in); border-top-left-radius: 0; }
+  .out .bubble { background: var(--out); border-top-right-radius: 0; }
+  .in .bubble::before { content: ""; position: absolute; top: 0; left: -7px; border: 7px solid transparent; border-top-color: var(--in); border-right-width: 0; }
+  .out .bubble::before { content: ""; position: absolute; top: 0; right: -7px; border: 7px solid transparent; border-top-color: var(--out); border-left-width: 0; }
+  .bubble .body { color: var(--txt); }
+  .bubble .stamp { float: right; margin: 2px 0 -2px 10px; font-size: 10px; color: var(--sub); display: inline-flex; align-items: center; gap: 3px; }
+  .out .bubble .stamp { color: #8fb9ac; }
+  .ticks { color: var(--sub); font-size: 11px; letter-spacing: -2px; }
+  .ticks.read { color: var(--tick); }
+
+  .conf .b2 { white-space: pre-line; }
+
+  .inbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px 15px; background: var(--header); }
+  .field { flex: 1; height: 36px; border-radius: 20px; background: #2a3942; color: #8696a0; font-size: 13px; display: flex; align-items: center; gap: 8px; padding: 0 13px; }
+  .mic { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #04211c; display: grid; place-items: center; font-size: 17px; }
+
+  .footer { text-align: center; opacity: 0; transition: opacity .5s ease; max-width: 360px; }
+  .footer.show { opacity: 1; }
+  .stat { font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .stat .hl { color: var(--accent); }
+  .brand { margin-top: 5px; font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: #5c6474; }
+
+  @media (prefers-reduced-motion: reduce) { .bubble { opacity: 1; transform: none; transition: none; } .footer { opacity: 1; } }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="statusbar">
+      <span>2:14</span>
+      <span class="r">
+        <span class="bars"><span></span><span></span><span></span><span></span></span>
+        <svg width="15" height="11" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 10.6a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM4 6.6a5.6 5.6 0 018 0M1.7 4.2a9 9 0 0112.6 0" stroke="#cfd6db" stroke-width="1.25" fill="none" stroke-linecap="round"/></svg>
+        <svg width="23" height="11" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.6" y="1.2" width="21" height="9.6" rx="2.6" fill="none" stroke="#cfd6db" stroke-opacity=".5"/><rect x="2.1" y="2.7" width="16" height="6.6" rx="1.4" fill="#cfd6db"/><rect x="22.4" y="4" width="1.6" height="4" rx="0.8" fill="#cfd6db" opacity=".5"/></svg>
+      </span>
+    </div>
+
+    <div class="wa-head">
+      <span class="back">‹</span>
+      <div class="av">❄️</div>
+      <div class="meta"><div class="nm">Cool Breeze AC</div><div class="st" id="st">online</div></div>
+      <div class="icons"><span>📹</span><span>📞</span><span>⋮</span></div>
+    </div>
+
+    <div class="chat" id="chat">
+      <div class="enc">🔒 Messages are end-to-end encrypted.</div>
+      <div class="daysep">TODAY</div>
+
+      <div class="row out hide"><div class="bubble"><span class="body">Good afternoon 🙏 my AC is not cooling, just blowing warm air. I'm in Lekki.</span><span class="stamp">2:14 PM <span class="ticks">✓✓</span></span></div></div>
+
+      <div class="row in hide"><div class="bubble"><span class="body">Good afternoon! Sorry about that 😊 Sounds like it may need a gas refill or a fault check. What's your address in Lekki, and a name for the booking?</span><span class="stamp">2:14 PM</span></div></div>
+
+      <div class="row out hide"><div class="bubble"><span class="body">17 Admiralty Way, Lekki Phase 1. Name is Chidi.</span><span class="stamp">2:15 PM <span class="ticks">✓✓</span></span></div></div>
+
+      <div class="row in hide"><div class="bubble"><span class="body">Thanks Chidi 🙏 A technician can come today between 2 and 4 PM. Diagnosis is ₦5,000, waived if you go ahead with the repair. Should I book it?</span><span class="stamp">2:15 PM</span></div></div>
+
+      <div class="row out hide"><div class="bubble"><span class="body">Yes please, thank you</span><span class="stamp">2:16 PM <span class="ticks">✓✓</span></span></div></div>
+
+      <div class="row in conf hide"><div class="bubble"><span class="body b2">✅ Booked!
+Cool Breeze AC
+📅 Today, 2:00 – 4:00 PM
+🔧 AC not cooling (Lekki)
+📍 17 Admiralty Way, Lekki Phase 1
+
+We'll message you when the technician is on the way. 🚐</span><span class="stamp">2:16 PM</span></div></div>
+    </div>
+
+    <div class="inbar"><div class="field">🙂 Message</div><div class="mic">🎤</div></div>
+  </div>
+
+  <div class="footer" id="footer">
+    <div class="stat">Replied and booked in ~30 seconds — <span class="hl">even mid-job.</span> Never leave a customer on "seen".</div>
+    <div class="brand">VNSIS · WhatsApp booking agent</div>
+  </div>
+
+<script>
+  const chat = document.getElementById("chat");
+  const st = document.getElementById("st");
+  const footer = document.getElementById("footer");
+  const rows = [...document.querySelectorAll(".row")];
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const scroll = () => { chat.scrollTop = chat.scrollHeight; };
+
+  function typing(on) { st.textContent = on ? "typing…" : "online"; st.classList.toggle("typing", on); }
+
+  function revealRow(row) {
+    row.classList.remove("hide"); scroll();
+    const b = row.querySelector(".bubble");
+    void b.offsetWidth;
+    b.classList.add("show"); scroll();
+    // out-going: ticks turn blue (read) a beat after send
+    if (row.classList.contains("out")) {
+      const tk = row.querySelector(".ticks");
+      setTimeout(() => tk && tk.classList.add("read"), 600);
+    }
+  }
+
+  async function outMsg(row) { revealRow(row); await wait(950); }
+  async function inMsg(row, ms) { typing(true); scroll(); await wait(ms); typing(false); revealRow(row); await wait(750); }
+
+  function reset() {
+    rows.forEach(r => { r.classList.add("hide"); const b = r.querySelector(".bubble"); b.classList.remove("show"); const tk = r.querySelector(".ticks"); if (tk) tk.classList.remove("read"); });
+    typing(false); footer.classList.remove("show"); scroll();
+  }
+
+  async function run() {
+    reset();
+    if (reduced) {
+      rows.forEach(r => { r.classList.remove("hide"); r.querySelector(".bubble").classList.add("show"); });
+      footer.classList.add("show"); scroll(); return;
+    }
+    await wait(650);
+    await outMsg(rows[0]);
+    await inMsg(rows[1], 1250);
+    await outMsg(rows[2]);
+    await inMsg(rows[3], 1350);
+    await outMsg(rows[4]);
+    await inMsg(rows[5], 1450);
+    await wait(500);
+    footer.classList.add("show");
+    await wait(4300);
+    await run();
+  }
+  run();
+</script>
+</body>
+</html>
